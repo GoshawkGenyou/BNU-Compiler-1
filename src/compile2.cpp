@@ -130,42 +130,53 @@ std::string convert_postfix_to_mips(const std::string& postfix_expr, SymbolTable
             std::string operand1 = operand_stack.top();
             operand_stack.pop();
 
-            // Load operand1 into $t0
-            if (symbol_table.get_offset(operand1) != -1) {
-                outFile << "lw $t0, " << symbol_table.get_offset(operand1) << "($fp)\n";
-            } else {
-                outFile << "li $t0, " << operand1 << "\n";  // Load constant
-            }
+		// Check if operand1 is a temporary register
+		if (operand1[0] == '$') {  
+			outFile << "# Operand1 is already in register: " << operand1 << "\n";
+			outFile << "move $t0, " << operand1 << "\n";  // Just move it
+		} 
+		else if (symbol_table.get_offset(operand1) != -1) {  // Check if it's a declared variable
+			outFile << "lw $t0, " << symbol_table.get_offset(operand1) << "($fp)\n";
+		} 
+		else {  // Assume it's an immediate value
+			outFile << "li $t0, " << operand1 << "\n";  
+		}
 
-            // Load operand2 into $t1
-            if (symbol_table.get_offset(operand2) != -1) {
-                outFile << "lw $t1, " << symbol_table.get_offset(operand2) << "($fp)\n";
-            } else {
-                outFile << "li $t1, " << operand2 << "\n";  // Load constant
-            }
+		// Check if operand2 is a temporary register
+		if (operand2[0] == '$') {  
+			outFile << "# Operand2 is already in register: " << operand2 << "\n";
+			outFile << "move $t1, " << operand2 << "\n";  // Just move it
+		} 
+		else if (symbol_table.get_offset(operand2) != -1) {  // Check if it's a declared variable
+			outFile << "lw $t1, " << symbol_table.get_offset(operand2) << "($fp)\n";
+		} 
+		else {  // Assume it's an immediate value
+			outFile << "li $t1, " << operand2 << "\n";  
+		}
 
-            // Perform the operation and store the result in $t0
-            outFile << "# Compute: $t0 = " << operand1 << " " << token << " " << operand2 << "\n";
-            if (token == "+") outFile << "add $t0, $t0, $t1\n";
-            else if (token == "-") outFile << "sub $t0, $t0, $t1\n";
-            else if (token == "*") outFile << "mul $t0, $t0, $t1\n";
+
+            // Perform the operation and store the result in $t2
+            outFile << "# Compute: $t2 = " << operand1 << " " << token << " " << operand2 << "\n";
+            if (token == "+") outFile << "add $t2, $t0, $t1\n";
+            else if (token == "-") outFile << "sub $t2, $t0, $t1\n";
+            else if (token == "*") outFile << "mul $t2, $t0, $t1\n";
             else if (token == "/") {
                 outFile << "div $t0, $t1\n";
-                outFile << "mflo $t0\n";  // Store quotient in $t0
+                outFile << "mflo $t2\n";  // Store quotient in $t2
             }
 
-            // Push the result (in $t0) back onto the stack as a temporary operand
-            operand_stack.push("$t0");
+            // Push the result (in $t2) back onto the stack as a temporary operand
+            operand_stack.push("$t2");
         }
     }
 
-    // The final result is in $t0
+    // The final result is in $t2
     if (operand_stack.size() != 1) {
-    	outFile << "# Compiler Error: Invalid postfix expression!\n";
         throw std::runtime_error("Invalid postfix expression: Too many operands remaining");
     }
 
-    return operand_stack.top();  // Return the final result (e.g., "$t0")
+    // Store the final result in the destination variable (if needed)
+    return operand_stack.top();  // Return the final result (e.g., "$t2")
 }
 
 void process_line(const std::string& line, SymbolTable& symbol_table, 
@@ -257,7 +268,7 @@ void process_line(const std::string& line, SymbolTable& symbol_table,
         }
 		
         // Store the result of the expression in the variable
-        outFile << "# Store result in " << var_name << "\n" << "sw $t0, " << offset << "($fp)\n";
+        outFile << "# Store result in " << var_name << "\n" << "sw " << result_register << ", " << offset << "($fp)\n";
     }
 }
 
