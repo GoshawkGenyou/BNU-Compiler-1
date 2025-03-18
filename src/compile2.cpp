@@ -130,49 +130,43 @@ std::string convert_postfix_to_mips(const std::string& postfix_expr, SymbolTable
             std::string operand1 = operand_stack.top();
             operand_stack.pop();
 
-            // Generate a temporary variable for the result
-            std::string temp_var = "temp" + std::to_string(temp_var_count++);
-            int temp_offset = symbol_table.add_variable(temp_var);
-
-            // Load operands into registers
+            // Load operand1 into $t0
             if (symbol_table.get_offset(operand1) != -1) {
                 outFile << "lw $t0, " << symbol_table.get_offset(operand1) << "($fp)\n";
             } else {
                 outFile << "li $t0, " << operand1 << "\n";  // Load constant
             }
 
+            // Load operand2 into $t1
             if (symbol_table.get_offset(operand2) != -1) {
                 outFile << "lw $t1, " << symbol_table.get_offset(operand2) << "($fp)\n";
             } else {
                 outFile << "li $t1, " << operand2 << "\n";  // Load constant
             }
 
-            // Perform the operation
-            outFile << "# Compute: " << temp_var << " = " << operand1 << " " << token << " " << operand2 << "\n";
-            if (token == "+") outFile << "add $t2, $t0, $t1\n";
-            else if (token == "-") outFile << "sub $t2, $t0, $t1\n";
-            else if (token == "*") outFile << "mul $t2, $t0, $t1\n";
+            // Perform the operation and store the result in $t0
+            outFile << "# Compute: $t0 = " << operand1 << " " << token << " " << operand2 << "\n";
+            if (token == "+") outFile << "add $t0, $t0, $t1\n";
+            else if (token == "-") outFile << "sub $t0, $t0, $t1\n";
+            else if (token == "*") outFile << "mul $t0, $t0, $t1\n";
             else if (token == "/") {
                 outFile << "div $t0, $t1\n";
-                outFile << "mflo $t2\n";  // Store quotient in $t2
+                outFile << "mflo $t0\n";  // Store quotient in $t0
             }
 
-            // Store the result in the temporary variable
-            outFile << "sw $t2, " << temp_offset << "($fp)\n";
-
-            // Push the temporary variable onto the stack
-            operand_stack.push(temp_var);
+            // Push the result (in $t0) back onto the stack as a temporary operand
+            operand_stack.push("$t0");
         }
     }
 
-    // The final result is the last operand on the stack
+    // The final result is in $t0
     if (operand_stack.size() != 1) {
+    	outFile << "# Compiler Error: Invalid postfix expression!\n";
         throw std::runtime_error("Invalid postfix expression: Too many operands remaining");
     }
 
-    return operand_stack.top();  // Return the final result variable
+    return operand_stack.top();  // Return the final result (e.g., "$t0")
 }
-
 
 void process_line(const std::string& line, SymbolTable& symbol_table, 
                   std::ofstream& outFile, int& temp_var_count) {
