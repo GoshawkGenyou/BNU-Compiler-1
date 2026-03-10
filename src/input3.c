@@ -1,0 +1,11 @@
+int a ;
+int b ;
+int c ;
+int d ;
+int e ;
+a = 1 ;
+b = 2 ;
+c = 3 ;
+d = 1 ;
+e = ( a + b * 2 ) / (c + d - 3) ;
+return e ;
